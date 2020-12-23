@@ -1,0 +1,40 @@
+author: Vasily Kiniv
+type: lib
+description: Driver for Sony DualShock 4 controller
+version: 1.0
+
+platforms: [ esp32 ]
+
+sources:
+  - src
+
+includes:
+  - include
+  - include/common
+  - include/osi
+  - include/stack
+
+filesystem:
+  - fs
+
+config_schema:
+  - ["ds4", "o", {title: "DualShock 4 settings"}]
+  - ["ds4.enable", "b", false, {title: "Enable DS4"}]
+  - ["ds4.discovery_timeout", "i", 10, {title: "Discovery timeout in 1.28s units(1-48)"}]
+  - ["ds4.sync_interval", "i", 10, {title: "Output sync interval in milliseconds"}]
+  - ["ds4.stick_threshold", "i", 1, {title: "Analog stick movement threshold"}]
+  - ["ds4.stick_deadzone", "i", 15, {title: "Analog stick deadzone"}]
+  - ["ds4.trigger_threshold", "i", 2, {title: "Analog trigger movement threshold"}]
+  - ["ds4.trigger_deadzone", "i", 5, {title: "Analog trigger deadzone"}]
+  - ["ds4.gyro_threshold", "i", 50, {title: "Gyroscope threshold"}]
+  - ["ds4.accel_threshold", "i", 300, {title: "Accelerometer threshold"}]
+
+tags:
+  - c
+  - ds4
+  - ps4
+  - dualshock
+  - playstation
+  - sony
+
+manifest_version: 2017-09-29
