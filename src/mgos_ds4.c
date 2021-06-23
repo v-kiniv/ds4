@@ -174,6 +174,7 @@ static bool deinit_bt_stack()
   esp_err_t ret;
 
   esp_bt_controller_mem_release(ESP_BT_MODE_CLASSIC_BT);
+  esp_bt_mem_release(ESP_BT_MODE_CLASSIC_BT);
 
   if ((ret = esp_bluedroid_disable()) != ESP_OK) {
     LOG(LL_ERROR, ("Disable bluedroid failed: %s", esp_err_to_name(ret)));
@@ -300,6 +301,7 @@ static void l2c_link_event_cb(uint16_t gap_handle, uint16_t event) {
       }
 
       if(m_disc_state.in_progress) {
+        m_disc_state.in_progress = false;
         LOG(LL_DEBUG, ("Controller paired"));
         mg_strfree(&c->mac);
         c->mac = address_to_str(m_disc_state.bda);
@@ -484,10 +486,13 @@ static void gap_event_cb(esp_bt_gap_cb_event_t event,
     if(event == ESP_BT_GAP_DISC_STATE_CHANGED_EVT) {
       if (param->disc_st_chg.state == ESP_BT_GAP_DISCOVERY_STOPPED) {
         LOG(LL_DEBUG, ("Device discovery stopped."));
+        
         mgos_event_trigger(MGOS_DS4_DISCOVERY_STOPPED, NULL);
         if(ds->found) {
           device_found_cb(ds->bda);
           ds->found = false;
+        } else {
+          m_disc_state.in_progress = false;
         }
       } else if (param->disc_st_chg.state == ESP_BT_GAP_DISCOVERY_STARTED) {
         LOG(LL_DEBUG, ("Discovery started."));
@@ -553,7 +558,28 @@ static struct controller * get_controller(int controller_index)
   return &m_ctrls[controller_index];
 }
 
-bool mgos_ds4_init(void) {
+static bool clear_device_registry()
+{
+  esp_bd_addr_t devices[12];
+  struct mg_str addr;
+  int num_devices = esp_bt_gap_get_bond_device_num();
+  LOG(LL_DEBUG, ("Removing %d devices from registry.", num_devices));
+
+  esp_bt_gap_get_bond_device_list(&num_devices, devices);
+  for (int i = 0; i < num_devices; i++) {
+    addr = address_to_str(devices[i]);
+    if(esp_bt_gap_remove_bond_device(devices[i]) == ESP_FAIL) {
+      LOG(LL_DEBUG, ("Failed to remove %s from registry.", addr.p));
+    } else {
+      LOG(LL_DEBUG, ("Successfuly removed %s from registry.", addr.p));
+    }
+    mg_strfree(&addr);
+  }
+  return true;
+}
+
+bool mgos_ds4_init(void)
+{
   mgos_event_register_base(MGOS_DS4_BASE, "ds4");
   if (!mgos_sys_config_get_ds4_enable()) {
     return true;
@@ -590,6 +616,8 @@ bool mgos_ds4_discover_and_pair(void)
   int timeout = MIN(MAX(mgos_sys_config_get_ds4_discovery_timeout(), 1), 48);
   m_disc_state.in_progress = true;
   
+  clear_device_registry();
+
   if(m_server_is_running) { // restart
     stop_server();
   }
