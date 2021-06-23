@@ -174,6 +174,7 @@ static bool deinit_bt_stack()
   esp_err_t ret;
 
   esp_bt_controller_mem_release(ESP_BT_MODE_CLASSIC_BT);
+  esp_bt_mem_release(ESP_BT_MODE_CLASSIC_BT);
 
   if ((ret = esp_bluedroid_disable()) != ESP_OK) {
     LOG(LL_ERROR, ("Disable bluedroid failed: %s", esp_err_to_name(ret)));
@@ -300,6 +301,7 @@ static void l2c_link_event_cb(uint16_t gap_handle, uint16_t event) {
       }
 
       if(m_disc_state.in_progress) {
+        m_disc_state.in_progress = false;
         LOG(LL_DEBUG, ("Controller paired"));
         mg_strfree(&c->mac);
         c->mac = address_to_str(m_disc_state.bda);
@@ -484,10 +486,13 @@ static void gap_event_cb(esp_bt_gap_cb_event_t event,
     if(event == ESP_BT_GAP_DISC_STATE_CHANGED_EVT) {
       if (param->disc_st_chg.state == ESP_BT_GAP_DISCOVERY_STOPPED) {
         LOG(LL_DEBUG, ("Device discovery stopped."));
+        
         mgos_event_trigger(MGOS_DS4_DISCOVERY_STOPPED, NULL);
         if(ds->found) {
           device_found_cb(ds->bda);
           ds->found = false;
+        } else {
+          m_disc_state.in_progress = false;
         }
       } else if (param->disc_st_chg.state == ESP_BT_GAP_DISCOVERY_STARTED) {
         LOG(LL_DEBUG, ("Discovery started."));
