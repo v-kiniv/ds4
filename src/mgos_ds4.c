@@ -553,7 +553,28 @@ static struct controller * get_controller(int controller_index)
   return &m_ctrls[controller_index];
 }
 
-bool mgos_ds4_init(void) {
+static bool clear_device_registry()
+{
+  esp_bd_addr_t devices[12];
+  struct mg_str addr;
+  int num_devices = esp_bt_gap_get_bond_device_num();
+  LOG(LL_DEBUG, ("Removing %d devices from registry.", num_devices));
+
+  esp_bt_gap_get_bond_device_list(&num_devices, devices);
+  for (int i = 0; i < num_devices; i++) {
+    addr = address_to_str(devices[i]);
+    if(esp_bt_gap_remove_bond_device(devices[i]) == ESP_FAIL) {
+      LOG(LL_DEBUG, ("Failed to remove %s from registry.", addr.p));
+    } else {
+      LOG(LL_DEBUG, ("Successfuly removed %s from registry.", addr.p));
+    }
+    mg_strfree(&addr);
+  }
+  return true;
+}
+
+bool mgos_ds4_init(void)
+{
   mgos_event_register_base(MGOS_DS4_BASE, "ds4");
   if (!mgos_sys_config_get_ds4_enable()) {
     return true;
@@ -590,6 +611,8 @@ bool mgos_ds4_discover_and_pair(void)
   int timeout = MIN(MAX(mgos_sys_config_get_ds4_discovery_timeout(), 1), 48);
   m_disc_state.in_progress = true;
   
+  clear_device_registry();
+
   if(m_server_is_running) { // restart
     stop_server();
   }
